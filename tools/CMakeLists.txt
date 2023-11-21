@@ -5,13 +5,20 @@ set(TOOLS benchmodel)
 add_custom_target(tools ALL
 	DEPENDS ${TOOLS})
 
+find_package(Eigen3 REQUIRED)
+
 include_directories(tools ..)
 include_directories(tools ${NAM_DEPS_PATH}/eigen)
 include_directories(tools ${NAM_DEPS_PATH}/nlohmann)
 
 add_executable(loadmodel loadmodel.cpp ${NAM_SOURCES})
-add_executable(reamp reamp.cpp ${NAM_SOURCES})
 add_executable(benchmodel benchmodel.cpp ${NAM_SOURCES})
+add_executable(reamp reamp.cpp ${NAM_SOURCES})
+
+# needed for macOS
+target_link_libraries(loadmodel Eigen3::Eigen)
+target_link_libraries(benchmodel Eigen3::Eigen)
+target_link_libraries(reamp Eigen3::Eigen)
 
 source_group(NAM ${CMAKE_CURRENT_SOURCE_DIR} FILES ${NAM_SOURCES})
 
