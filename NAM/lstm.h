@@ -22,7 +22,7 @@ class LSTMCell
 {
 public:
   LSTMCell(const int input_size, const int hidden_size, std::vector<float>::iterator& params);
-  Eigen::VectorXf get_hidden_state() const { return this->_xh(Eigen::lastN(this->_get_hidden_size())); };
+  Eigen::VectorXf get_hidden_state() const { return this->_xh(Eigen::placeholders::lastN(this->_get_hidden_size())); };
   void process_(const Eigen::VectorXf& x);
 
 private:
