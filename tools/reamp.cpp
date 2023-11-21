@@ -122,19 +122,13 @@ int main(int argc, char* argv[])
 
   // Process the audio data using DSP in chunks
   const int bufferSize = 8096;
+  double sampleRate = 44100;
 
   const char* inputFilename = argv[2];
-
-  // Read input audio file
   const char* outputFilename = argv[3];
+
   std::ofstream outputFile(outputFilename, std::ios::binary);
 
-  double sampleRate = 44100;
-  // double* inputBuffer = nullptr;
-  // WavHeader inputHeader;
-
-
-  // std::vector<double> outputBuffer(bufferSize);
   // Load audio data from WAV file
   std::vector<float> inputBuffer;
   dsp::wav::Load(inputFilename, inputBuffer, sampleRate);
@@ -146,10 +140,6 @@ int main(int argc, char* argv[])
   // Process the audio data in chunks
   const int numFrames = doubleInputBuffer.size();
   std::vector<NAM_SAMPLE> outputBuffer(numFrames);
-
-  // Allocate memory for the output buffer
-  // double* outputBuffer = new double[inputHeader.dataSize / sizeof(double)];
-  // double* outputBuffer = new double[inputHeader.dataSize];
 
   // std::cout << "datasize " << inputHeader.dataSize << std::endl;
   std::cout << "inputBuffer " << inputBuffer.size() << std::endl;
@@ -174,109 +164,7 @@ int main(int argc, char* argv[])
 
   outputFile.close();
 
-  // for (size_t i = 0; i < inputBuffer.size() / sizeof(double); i += bufferSize)
-  // {
-  //   size_t chunkSize = std::min(bufferSize, inputBuffer.size() / sizeof(double) - i);
-
-  //   std::cout << "i=" << i << std::endl;
-  //   std::cout << "chunkSize=" << chunkSize << std::endl;
-
-  //   model->process(doubleBuffer.data(), outputBuffer.data(), inputBuffer.size());
-  //   model->finalize_(bufferSize);
-  // }
-
-
-  // for (size_t i = 0; i < inputHeader.dataSize / sizeof(double); i += bufferSize)
-  // {
-
-  //   size_t chunkSize = std::min(bufferSize, inputHeader.dataSize / sizeof(double) - i);
-  //   std::cout << "i=" << i << std::endl;
-  //   std::cout << "chunkSize=" << chunkSize << std::endl;
-
-  //   // model->process(inputBuffer + i, outputBuffer + i, chunkSize);
-  //   // model->finalize_(chunkSize);
-  // }
-
-  // Clean up allocated memory
-  // delete[] inputBuffer;
-  // delete[] outputBuffer;
-
   std::cout << "WAV file successfully processed and written." << std::endl;
 
   exit(0);
 }
-
-/*
-int main(int argc, char* argv[])
-{
-
-  const char* modelPath = argv[1];
-
-  // Check if the correct number of command-line arguments is provided
-  if (argc != 4)
-  {
-    std::cerr << "Usage: " << argv[0] << " <model_filename> <input_filename> <output_filename>" << std::endl;
-    return 1;
-  }
-
-  std::cout << "Loading model " << modelPath << "\n";
-
-  // Turn on fast tanh approximation
-  activations::Activation::enable_fast_tanh();
-
-  std::unique_ptr<DSP> model;
-  model.reset();
-  model = std::move(get_dsp(modelPath));
-
-  if (model == nullptr)
-  {
-    std::cerr << "Failed to load model\n";
-
-    exit(1);
-  }
-
-
-  // Read input audio file
-  const char* inputFilename = argv[2];
-  double* inputBuffer = nullptr;
-  WavHeader inputHeader;
-
-  if (!readWavFile(inputFilename, inputBuffer, inputHeader))
-  {
-    return 1;
-  }
-
-  // Process the audio data using DSP in chunks
-  const size_t bufferSize = 1024;
-
-  // Allocate memory for the output buffer
-  double* outputBuffer = new double[inputHeader.dataSize / sizeof(double)];
-
-  for (size_t i = 0; i < inputHeader.dataSize / sizeof(double); i += bufferSize)
-  {
-    size_t chunkSize = std::min(bufferSize, inputHeader.dataSize / sizeof(double) - i);
-
-    // Process the current chunk
-    processAudioBuffer(model, inputBuffer + i, outputBuffer + i, chunkSize);
-  }
-
-  // Write the processed data to the output audio file
-  const char* outputFilename = argv[3];
-  WavHeader outputHeader = inputHeader;
-  outputHeader.dataSize = static_cast<uint32_t>(inputHeader.dataSize);
-
-  if (!writeWavFile(outputFilename, outputBuffer, outputHeader))
-  {
-    return 1;
-  }
-
-  // Clean up allocated memory
-  delete[] inputBuffer;
-  delete[] outputBuffer;
-
-  std::cout << "WAV file successfully processed and written." << std::endl;
-
-
-  exit(0);
-}
-*/
