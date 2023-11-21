@@ -7,6 +7,8 @@ add_custom_target(tools ALL
 
 # find_package(Eigen3 REQUIRED)
 
+find_package(SndFile REQUIRED)
+
 include_directories(tools ..)
 include_directories(tools ${NAM_DEPS_PATH}/eigen)
 include_directories(tools ${NAM_DEPS_PATH}/nlohmann)
@@ -14,6 +16,8 @@ include_directories(tools ${NAM_DEPS_PATH}/nlohmann)
 add_executable(loadmodel loadmodel.cpp ${NAM_SOURCES})
 add_executable(benchmodel benchmodel.cpp ${NAM_SOURCES})
 add_executable(reamp reamp.cpp ${NAM_SOURCES})
+
+target_link_libraries(reamp PRIVATE SndFile::sndfile)
 
 # needed for macOS
 # target_link_libraries(loadmodel Eigen3::Eigen)

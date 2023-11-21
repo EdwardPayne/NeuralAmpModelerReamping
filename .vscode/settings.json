@@ -60,6 +60,12 @@
         "streambuf": "cpp",
         "thread": "cpp",
         "typeinfo": "cpp",
-        "valarray": "cpp"
+        "valarray": "cpp",
+        "condition_variable": "cpp",
+        "list": "cpp",
+        "hash_map": "cpp",
+        "future": "cpp",
+        "mutex": "cpp",
+        "cinttypes": "cpp"
     }
 }
