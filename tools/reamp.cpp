@@ -100,6 +100,7 @@ int main(int argc, char* argv[])
   {
     sf_count_t bytesRead = sf_readf_double(inputFilePtr, buffer.data(), bufferSize);
 
+
     if (bytesRead <= 0)
     {
       // End of file or error
@@ -109,16 +110,19 @@ int main(int argc, char* argv[])
     model->process(buffer.data(), processedBuffer.data(), bytesRead);
     model->finalize_(bytesRead);
 
-    sf_writef_double(outputFilePtr, processedBuffer.data(), bytesRead);
-
     printProgressBar(chunkIndex, numChunks);
+
+    sf_writef_double(outputFilePtr, processedBuffer.data(), bytesRead);
   }
+
+  // Just make the progress bar show 100%
+  printProgressBar(100, 100);
 
   // Close the input and output files
   sf_close(inputFilePtr);
   sf_close(outputFilePtr);
 
-  std::cout << std::endl << "WAV file successfully processed and written." << std::endl;
+  std::cout << "WAV file successfully processed and written." << std::endl;
 
   exit(0);
 }
