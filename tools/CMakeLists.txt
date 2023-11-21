@@ -1,4 +1,4 @@
-file(GLOB_RECURSE NAM_SOURCES ../NAM/*.cpp ../NAM/*.c ../NAM*.h)
+file(GLOB_RECURSE NAM_SOURCES ../NAM/*.cpp ../NAM/*.c ../NAM*.h ./dsp/*.cpp ../dsp/*.c ../dsp*.h)
 
 set(TOOLS benchmodel)
 
@@ -10,6 +10,7 @@ include_directories(tools ${NAM_DEPS_PATH}/eigen)
 include_directories(tools ${NAM_DEPS_PATH}/nlohmann)
 
 add_executable(loadmodel loadmodel.cpp ${NAM_SOURCES})
+add_executable(reamp reamp.cpp ${NAM_SOURCES})
 add_executable(benchmodel benchmodel.cpp ${NAM_SOURCES})
 
 source_group(NAM ${CMAKE_CURRENT_SOURCE_DIR} FILES ${NAM_SOURCES})

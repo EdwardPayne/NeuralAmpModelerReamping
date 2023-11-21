@@ -13,7 +13,7 @@ int main(int argc, char* argv[])
 
     if (model != nullptr)
     {
-      fprintf(stderr, "Model loaded successfully\n");
+      fprintf(stderr, "YEAH! Model loaded successfully\n");   
     }
     else
     {
