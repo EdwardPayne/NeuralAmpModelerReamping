@@ -24,7 +24,6 @@ make
 
 ```bash
 ./tools/reamp ../testfiles/05-full-metal.nam ../testfiles/first_5_seconds.wav output.wav
-
 ```
 
 ## Sharp edges
