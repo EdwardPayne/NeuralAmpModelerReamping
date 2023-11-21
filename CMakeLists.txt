@@ -9,26 +9,19 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED OFF)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Funkar på Linux
-# set(CMAKE_CXX_COMPILER "clang++")
-# set(CMAKE_C_COMPILER "clang")
-# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -std=c++11")
-
-# set(CMAKE_CXX_COMPILER "clang++")
-# set(CMAKE_C_COMPILER "clang")
-# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++ -std=c++20")
-
-# Testar för macOS
 set(CMAKE_CXX_COMPILER "clang++")
 set(CMAKE_C_COMPILER "clang")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++ -std=c++20")
-
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++ -std=c++20")
 	include_directories(SYSTEM /usr/local/include)
+
 elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -std=c++11")	
 	link_libraries(stdc++fs)
+
 elseif (CMAKE_SYSTEM_NAME STREQUAL "Windows")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++ -std=c++20")
 	add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
 else()
 	message(FATAL_ERROR "Unrecognized Platform!")
