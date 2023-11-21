@@ -1,4 +1,9 @@
-#include "malloc.h"
+#ifdef __APPLE__
+  #include <cstdlib> // For macOS and other Apple platforms
+#else
+  #include <malloc.h> // For other platforms
+#endif
+
 #include <iostream>
 #include <chrono>
 
