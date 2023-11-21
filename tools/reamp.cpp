@@ -44,7 +44,6 @@ void printProgressBar(int current, int total, int width = 40)
 
 int main(int argc, char* argv[])
 {
-
   const int bufferSize = 8096;
 
   // Turn on fast tanh approximation
