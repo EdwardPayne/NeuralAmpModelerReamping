@@ -47,7 +47,7 @@ int main(int argc, char* argv[])
   const int bufferSize = 8096;
 
   // Turn on fast tanh approximation
-  activations::Activation::enable_fast_tanh();
+  nam::activations::Activation::enable_fast_tanh();
 
   // Check if the correct number of command-line arguments is provided
   if (argc != 4)
@@ -58,9 +58,9 @@ int main(int argc, char* argv[])
 
   const char* modelPath = argv[1];
   std::cout << "Loading model " << modelPath << "\n";
-  std::unique_ptr<DSP> model;  
+  std::unique_ptr<nam::DSP> model;
   model.reset();
-  model = std::move(get_dsp(modelPath));
+  model = std::move(nam::get_dsp(modelPath));
 
   if (model == nullptr)
   {
