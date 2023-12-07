@@ -1,4 +1,4 @@
-file(GLOB_RECURSE NAM_SOURCES ../NAM/*.cpp ../NAM/*.c ../NAM*.h ./dsp/*.cpp ../dsp/*.c ../dsp*.h)
+file(GLOB_RECURSE NAM_SOURCES ../NAM/*.cpp ../NAM/*.c ../NAM/*.h ./dsp/*.cpp ../dsp/*.c ../dsp/*.h)
 
 set(TOOLS benchmodel)
 

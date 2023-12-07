@@ -7,6 +7,10 @@
 #include <iostream>
 #include <vector>
 #include <fstream>
+#include <thread>
+#include <atomic>
+#include <mutex>
+#include <condition_variable>
 
 #include <sndfile.h>
 
@@ -14,11 +18,18 @@
 #include "NAM/dsp.h"
 #include "NAM/wavenet.h"
 
-void printProgressBar(int current, int total, int width = 40)
+std::mutex ioMutex;
+std::atomic<int> chunksProcessed(0);
+std::condition_variable cv;
+bool allThreadsFinished = false;
+
+/*
+void printProgressBarORIGINAL(int current, int total, int width = 40)
 {
   float progress = static_cast<float>(current) / total;
   int barWidth = static_cast<int>(progress * width);
 
+  std::lock_guard<std::mutex> lock(ioMutex);
   std::cout << "[";
   for (int i = 0; i < width; ++i)
   {
@@ -40,6 +51,97 @@ void printProgressBar(int current, int total, int width = 40)
   {
     std::cout << std::endl;
   }
+}
+
+void processAudioChunkOLD(std::unique_ptr<nam::DSP>& model, std::vector<NAM_SAMPLE>& buffer,
+                       std::vector<NAM_SAMPLE>& processedBuffer, sf_count_t chunkIndex, sf_count_t numChunks,
+                       SNDFILE* inputFilePtr, SNDFILE* outputFilePtr, int bufferSize)
+{
+
+  sf_count_t bytesRead = sf_readf_double(inputFilePtr, buffer.data(), bufferSize);
+  std::cout << "processAudioChunk " << bytesRead << std::endl;
+
+  if (bytesRead <= 0)
+  {
+    // End of file or error
+    return;
+  }
+
+  model->process(buffer.data(), processedBuffer.data(), bytesRead);
+  model->finalize_(bytesRead);
+
+  // {
+  //   std::lock_guard<std::mutex> lock(ioMutex);
+  //   ++chunksProcessed;
+  //   // printProgressBar(chunksProcessed, numChunks);
+  // }
+  cv.notify_one(); // Notify waiting threads that a chunk has been processed
+
+  sf_writef_double(outputFilePtr, processedBuffer.data(), bytesRead);
+}
+*/
+
+void printProgressBar(int current, int total, int width = 40)
+{
+  std::ostringstream progressBar;
+
+  {
+    std::lock_guard<std::mutex> lock(ioMutex);
+
+    float progress = static_cast<float>(current) / total;
+    int barWidth = static_cast<int>(progress * width);
+
+    progressBar << "[";
+    for (int i = 0; i < width; ++i)
+    {
+      if (i < barWidth)
+      {
+        progressBar << "=";
+      }
+      else
+      {
+        progressBar << " ";
+      }
+    }
+
+    progressBar << "] " << std::fixed << std::setprecision(1) << (progress * 100.0) << "%\r";
+  }
+
+  std::cout << progressBar.str();
+  std::cout.flush();
+
+  // Print a newline when the progress is complete
+  if (current == total)
+  {
+    std::cout << std::endl;
+  }
+}
+
+
+void processAudioChunk(std::unique_ptr<nam::DSP>& model, std::vector<NAM_SAMPLE>& buffer,
+                       std::vector<NAM_SAMPLE>& processedBuffer, sf_count_t chunkIndex, sf_count_t numChunks,
+                       SNDFILE* inputFilePtr, SNDFILE* outputFilePtr, int bufferSize)
+{
+  sf_count_t bytesRead = sf_readf_double(inputFilePtr, buffer.data(), bufferSize);
+  std::cout << "processAudioChunk " << bytesRead << std::endl;
+
+  if (bytesRead <= 0)
+  {
+    // End of file or error
+    return;
+  }
+
+  model->process(buffer.data(), processedBuffer.data(), bytesRead);
+  model->finalize_(bytesRead);
+
+  // {
+  //   std::lock_guard<std::mutex> lock(ioMutex);
+  //   ++chunksProcessed;
+  //   //   // printProgressBar(chunksProcessed, numChunks);
+  //   cv.notify_one(); // Notify waiting threads that a chunk has been processed
+  // }
+
+  sf_writef_double(outputFilePtr, processedBuffer.data(), bytesRead);
 }
 
 int main(int argc, char* argv[])
@@ -95,27 +197,67 @@ int main(int argc, char* argv[])
 
   sf_count_t numChunks = sfInfo.frames / bufferSize;
 
-  for (sf_count_t chunkIndex = 0; chunkIndex < numChunks; ++chunkIndex)
+  // for (sf_count_t chunkIndex = 0; chunkIndex < numChunks; ++chunkIndex)
+  // {
+  //   sf_count_t bytesRead = sf_readf_double(inputFilePtr, buffer.data(), bufferSize);
+
+
+  //   if (bytesRead <= 0)
+  //   {
+  //     // End of file or error
+  //     break;
+  //   }
+
+  //   model->process(buffer.data(), processedBuffer.data(), bytesRead);
+  //   model->finalize_(bytesRead);
+
+  //   printProgressBar(chunkIndex, numChunks);
+
+  //   sf_writef_double(outputFilePtr, processedBuffer.data(), bytesRead);
+  // }
+
+  // // Just make the progress bar show 100%
+  // printProgressBar(100, 100);
+
+
+  const unsigned int numCores = std::thread::hardware_concurrency();
+  std::cout << "Number of cores: " << numCores << std::endl;
+  std::vector<std::thread> threads;
+
+  for (unsigned int i = 0; i < numCores; ++i)
   {
-    sf_count_t bytesRead = sf_readf_double(inputFilePtr, buffer.data(), bufferSize);
+    threads.emplace_back([&]() {
+      while (true)
+      {
+        std::unique_lock<std::mutex> lock(ioMutex);
+        cv.wait(lock, [&] { return chunksProcessed < numChunks || allThreadsFinished; });
 
+        sf_count_t chunkIndex = chunksProcessed;
+        if (chunkIndex >= numChunks)
+        {
+          allThreadsFinished = true;
+          lock.unlock();
+          cv.notify_all();
+          break; // All chunks processed
+        }
 
-    if (bytesRead <= 0)
-    {
-      // End of file or error
-      break;
-    }
+        processAudioChunk(
+          model, buffer, processedBuffer, chunkIndex, numChunks, inputFilePtr, outputFilePtr, bufferSize);
 
-    model->process(buffer.data(), processedBuffer.data(), bytesRead);
-    model->finalize_(bytesRead);
-
-    printProgressBar(chunkIndex, numChunks);
-
-    sf_writef_double(outputFilePtr, processedBuffer.data(), bytesRead);
+        lock.unlock();
+      }
+    });
   }
 
-  // Just make the progress bar show 100%
-  printProgressBar(100, 100);
+
+  // Wait for all threads to finish
+  {
+    std::unique_lock<std::mutex> lock(ioMutex);
+    cv.wait(lock, [&] {
+      std::cout << "Waiting.." << std::endl;
+      return allThreadsFinished;
+    });
+  }
 
   // Close the input and output files
   sf_close(inputFilePtr);
