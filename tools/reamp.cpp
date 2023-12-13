@@ -90,7 +90,11 @@ void doWork(char* modelFileName, char* inputFileName, SNDFILE* outputFilePtr, sf
             sf_count_t endFrame, int threadId, std::vector<NAM_SAMPLE>& result, std::mutex& mutex,
             sf_count_t bufferSize)
 {
-  std::cout << "Thread start id " << threadId << " startFrame=" << startFrame << " endFrame=" << endFrame << std::endl;
+  {
+    std::lock_guard<std::mutex> lock(bufferMutex);
+    std::cout << "Thread start id " << threadId << " startFrame=" << startFrame << " endFrame=" << endFrame
+              << std::endl;
+  }
 
   std::unique_ptr<nam::DSP> model = loadModel(modelFileName);
 
@@ -108,20 +112,20 @@ void doWork(char* modelFileName, char* inputFileName, SNDFILE* outputFilePtr, sf
 
   sf_count_t startPosition = sf_seek(inputFilePtr, startFrame, 0);
 
-  std::cout << "t_id " << threadId << " restBuffer=" << ((endFrame - startFrame) % bufferSize) << std::endl;
-  std::cout << "t_id " << threadId << " numFrames=" << numFrames << std::endl;
-  std::cout << "t_id " << threadId << " startPosition=" << startPosition << std::endl;
-  std::cout << "t_id " << threadId << " endFrame=" << endFrame << std::endl;
+  // std::cout << "t_id " << threadId << " restBuffer=" << ((endFrame - startFrame) % bufferSize) << std::endl;
+  // std::cout << "t_id " << threadId << " numFrames=" << numFrames << std::endl;
+  // std::cout << "t_id " << threadId << " startPosition=" << startPosition << std::endl;
+  // std::cout << "t_id " << threadId << " endFrame=" << endFrame << std::endl;
 
   for (sf_count_t frameIndex = 0; frameIndex < numBuffers + restBuffer; ++frameIndex)
   {
     sf_count_t bytesRead = sf_readf_double(inputFilePtr, buffer.data(), bufferSize);
 
-    std::cout << "t_id " << threadId << " frame " << frameIndex + 1 << "/" << numFrames << std::endl;
+    // std::cout << "t_id " << threadId << " frame " << frameIndex + 1 << "/" << numFrames << std::endl;
 
     if (bytesRead <= 0)
     {
-      std::cerr << "End of file or error" << std::endl;
+      std::cerr << "t_id " << threadId << " End of file or error" << std::endl;
       // End of file or error
       break;
     }
@@ -132,7 +136,7 @@ void doWork(char* modelFileName, char* inputFileName, SNDFILE* outputFilePtr, sf
       buffer.resize(bytesRead);
     };
 
-    std::cout << "t_id " << threadId << " bytesRead = " << bytesRead << std::endl;
+    // std::cout << "t_id " << threadId << " bytesRead = " << bytesRead << std::endl;
 
     model->process(buffer.data(), processedBuffer.data(), bytesRead);
     model->finalize_(bytesRead);
@@ -190,7 +194,8 @@ int main(int argc, char* argv[])
     exit(1);
   }
 
-  const int numThreads = 10; // Set your desired number of threads
+  const int numThreads = std::thread::hardware_concurrency();
+  // Set your desired number of threads
 
   std::vector<NAM_SAMPLE> buffer(bufferSize * sfInfo.channels);
   std::vector<NAM_SAMPLE> processedBuffer; //(bufferSize * sfInfo.channels);
