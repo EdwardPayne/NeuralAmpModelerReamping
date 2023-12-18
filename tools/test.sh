@@ -8,7 +8,8 @@ binary="./tools/reamp"
 
 # Input files
 nam_file="../testfiles/05-full-metal.nam"
-input_file="../testfiles/first_5_seconds.wav"
+# input_file="../testfiles/first_5_seconds.wav"
+input_file="../testfiles/git1_di_cheeze.wav"
 
 # Loop through and execute the binary with increasing numbers
 for ((i = 1; i <= num_loops; i++)); do

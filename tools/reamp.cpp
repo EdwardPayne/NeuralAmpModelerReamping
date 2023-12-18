@@ -18,8 +18,7 @@
 #include "NAM/wav.h"
 #include "NAM/dsp.h"
 #include "NAM/wavenet.h"
-std::mutex bufferMutex;
-std::mutex fileMutex;
+std::mutex outputMutex;
 
 void printProgressBar(int current, int total, int width = 40)
 {
@@ -92,11 +91,7 @@ void doWork(char* modelFileName, char* inputFileName, SNDFILE* outputFilePtr, sf
             sf_count_t endFrame, int threadId, std::vector<NAM_SAMPLE>& result, std::mutex& mutex,
             sf_count_t bufferSize)
 {
-  // {
-  //   std::lock_guard<std::mutex> lock(bufferMutex);
-  //   std::cout << "Thread start id " << threadId << " startFrame=" << startFrame << " endFrame=" << endFrame
-  //             << std::endl;
-  // }
+
 
   std::unique_ptr<nam::DSP> model = loadModel(modelFileName);
 
@@ -111,6 +106,13 @@ void doWork(char* modelFileName, char* inputFileName, SNDFILE* outputFilePtr, sf
 
   sf_count_t numBuffers = ((endFrame - startFrame) / bufferSize) + 1;
   sf_count_t restBuffer = ((endFrame - startFrame) % bufferSize) > 0 ? 1 : 0;
+
+  {
+    std::lock_guard<std::mutex> lock(outputMutex);
+    // std::cout << "Thread start id " << threadId << " startFrame=" << startFrame << " endFrame=" << endFrame
+    //           << std::endl;
+    std::cout << "Thread start id " << threadId << " numBuffers " << numBuffers << std::endl;
+  }
 
   sf_count_t startPosition = sf_seek(inputFilePtr, startFrame, 0);
 
@@ -150,12 +152,12 @@ void doWork(char* modelFileName, char* inputFileName, SNDFILE* outputFilePtr, sf
 
   sf_close(inputFilePtr);
 
-  std::cout << "Thread ended id " << threadId << std::endl;
+  // std::cout << "Thread ended id " << threadId << std::endl;
 }
 
 int main(int argc, char* argv[])
 {
-  const int bufferSize = 8192;
+  int bufferSize = 8192;
 
   // Turn on fast tanh approximation
   nam::activations::Activation::enable_fast_tanh();
@@ -193,12 +195,13 @@ int main(int argc, char* argv[])
   const unsigned int numThreadsMax = threadsOverride > 0 ? threadsOverride : std::thread::hardware_concurrency();
   unsigned int numThreads = numThreadsMax;
 
-  // make sure we have atleast 2 chunks for each thread, decrease threads if we have to, minimum 1 thread.
-  while (numThreads > 0 && (numChunks / numThreads) < 2)
+  // make sure we have atleast 4 chunks for each thread, decrease threads if we have to, minimum 1 thread.
+  while (numThreads > 0 && (numChunks / numThreads) < 4)
   {
+    std::cout << "Adjusting threads count=" << numThreads << " chunkdPerThreads=" << (numChunks / numThreads)
+              << std::endl;
     if (--numThreads < 1)
     {
-      numThreads = 1;
       break;
     };
   }
@@ -210,6 +213,7 @@ int main(int argc, char* argv[])
 
   std::cout << "threads=" << numThreads << std::endl;
   std::cout << "totalFrames=" << totalFrames << std::endl;
+  std::cout << "numChunks=" << numChunks << std::endl;
   std::cout << "chunkSize per thread=" << chunkSizePerThread << std::endl;
 
   // Launch threads
