@@ -99,13 +99,12 @@ void doWork(char* modelFileName, char* inputFileName, SNDFILE* outputFilePtr, sf
   SF_INFO sfInfo;
   SNDFILE* inputFilePtr = loadSoundfile(inputFileName, SFM_READ, &sfInfo);
 
+  sf_count_t numFrames = (endFrame - startFrame);
+  sf_count_t numBuffers = (numFrames / bufferSize) + 1;
+  sf_count_t restBuffer = (numFrames % bufferSize) > 0 ? 1 : 0;
+
   std::vector<NAM_SAMPLE> buffer(bufferSize * sfInfo.channels);
   std::vector<NAM_SAMPLE> processedBuffer(bufferSize * sfInfo.channels);
-
-  // sf_count_t numFrames = ((endFrame - startFrame) / bufferSize);
-
-  sf_count_t numBuffers = ((endFrame - startFrame) / bufferSize) + 1;
-  sf_count_t restBuffer = ((endFrame - startFrame) % bufferSize) > 0 ? 1 : 0;
 
   {
     std::lock_guard<std::mutex> lock(outputMutex);
@@ -116,10 +115,10 @@ void doWork(char* modelFileName, char* inputFileName, SNDFILE* outputFilePtr, sf
 
   sf_count_t startPosition = sf_seek(inputFilePtr, startFrame, 0);
 
-  // std::cout << "t_id " << threadId << " restBuffer=" << ((endFrame - startFrame) % bufferSize) << std::endl;
-  // std::cout << "t_id " << threadId << " numFrames=" << numFrames << std::endl;
-  // std::cout << "t_id " << threadId << " startPosition=" << startPosition << std::endl;
-  // std::cout << "t_id " << threadId << " endFrame=" << endFrame << std::endl;
+  std::cout << "t_id " << threadId << " restBuffer=" << (numFrames % bufferSize) << std::endl;
+  std::cout << "t_id " << threadId << " numBuffers=" << numBuffers << std::endl;
+  std::cout << "t_id " << threadId << " startPosition=" << startPosition << std::endl;
+  std::cout << "t_id " << threadId << " endFrame=" << endFrame << std::endl;
 
   for (sf_count_t frameIndex = 0; frameIndex < numBuffers + restBuffer; ++frameIndex)
   {
@@ -127,7 +126,7 @@ void doWork(char* modelFileName, char* inputFileName, SNDFILE* outputFilePtr, sf
 
     if (bytesRead <= 0)
     {
-      // std::cerr << "t_id " << threadId << " End of file or error " << bytesRead << std::endl;
+      std::cerr << "t_id " << threadId << " End of file or error " << bytesRead << std::endl;
       // End of file or error
       break;
     }
@@ -138,10 +137,15 @@ void doWork(char* modelFileName, char* inputFileName, SNDFILE* outputFilePtr, sf
       buffer.resize(bytesRead);
     };
 
-    // std::cout << "t_id " << threadId << " bytesRead = " << bytesRead << std::endl;
 
     model->process(buffer.data(), processedBuffer.data(), bytesRead);
     model->finalize_(bytesRead);
+
+
+    // std::cout << "t_id " << threadId << " result.size() = " << result.size() << std::endl;
+    // std::cout << "t_id " << threadId << " bytesRead = " << bytesRead << std::endl;
+    // std::cout << "t_id " << threadId << " processedBuffer.size() = " << processedBuffer.size() << std::endl;
+    // std::cout << "t_id " << threadId << " buffer.size() = " << buffer.size() << std::endl;
 
     // Loop to append data from processedBuffer to result
     for (const auto& element : processedBuffer)
@@ -155,9 +159,65 @@ void doWork(char* modelFileName, char* inputFileName, SNDFILE* outputFilePtr, sf
   // std::cout << "Thread ended id " << threadId << std::endl;
 }
 
+
+void loopAudio(const char *inputFilename, const char *outputFilename) {
+    SF_INFO sfInfo;
+    SNDFILE *inputFile = sf_open(inputFilename, SFM_READ, &sfInfo);
+    if (!inputFile) {
+        std::cerr << "Error opening input file: " << sf_strerror(nullptr) << std::endl;
+        return;
+    }
+
+    // Check if the file is stereo
+    if (sfInfo.channels != 1 && sfInfo.channels != 2) {
+        std::cerr << "Unsupported number of channels. Only mono and stereo files are supported." << std::endl;
+        sf_close(inputFile);
+        return;
+    }
+
+    // Set up buffer for reading audio data
+    const int buffer_size = 1024;
+    float buffer[buffer_size * sfInfo.channels];
+
+    SF_INFO outputInfo = sfInfo;
+    SNDFILE *outputFile = sf_open(outputFilename, SFM_WRITE, &outputInfo);
+    if (!outputFile) {
+        std::cerr << "Error opening output file: " << sf_strerror(nullptr) << std::endl;
+        sf_close(inputFile);
+        return;
+    }
+
+    while (true) {
+        sf_count_t num_frames = sf_readf_float(inputFile, buffer, buffer_size);
+        if (num_frames <= 0) {
+            break;
+        }
+
+        // Process the audio data here
+        // ...
+
+        // You can access individual samples in the buffer like this:
+        // buffer[i] for mono, buffer[i * 2] and buffer[i * 2 + 1] for stereo
+
+        // Write the processed frames to the output file
+        sf_writef_float(outputFile, buffer, num_frames);
+
+        // Print some information
+        std::cout << "Read " << num_frames << " frames." << std::endl;
+
+        // If you want to exit the loop after processing a certain number of frames, you can add a condition here.
+        // For example, if you want to process only the first 1000 frames:
+        // if (num_frames >= 1000) break;
+    }
+
+    // Close the files when done
+    sf_close(inputFile);
+    sf_close(outputFile);
+}
+
 int main(int argc, char* argv[])
 {
-  int bufferSize = 8192;
+  int bufferSize = 1024;
 
   // Turn on fast tanh approximation
   nam::activations::Activation::enable_fast_tanh();
@@ -168,6 +228,9 @@ int main(int argc, char* argv[])
   char* inputFileName = argv[2];
   char* outputFileName = argv[3];
   int threadsOverride = (argc == 5 && atoi(argv[4]) > 0) ? atoi(argv[4]) : 0;
+
+// loopAudio(inputFileName, outputFileName);
+//   return 1;
 
   std::unique_ptr<nam::DSP> model = loadModel(modelFileName);
 
@@ -214,6 +277,7 @@ int main(int argc, char* argv[])
   std::cout << "threads=" << numThreads << std::endl;
   std::cout << "totalFrames=" << totalFrames << std::endl;
   std::cout << "numChunks=" << numChunks << std::endl;
+  std::cout << "channels=" << sfInfo.channels << std::endl;
   std::cout << "chunkSize per thread=" << chunkSizePerThread << std::endl;
 
   // Launch threads
@@ -260,17 +324,23 @@ int main(int argc, char* argv[])
 
   for (int i = 0; i < numThreads; ++i)
   {
-    sf_writef_double(outputFilePtr, resultVectors[i].data(), resultVectors[i].size());
+    std::cout << "t_id " << i << " resultVectors[i].size() = " << resultVectors[i].size() << std::endl;
+    // sf_writef_double(outputFilePtr, resultVectors[i].data(), resultVectors[i].size());
+    sf_count_t writtenSamples = sf_writef_double(outputFilePtr, resultVectors[i].data(), resultVectors[i].size());
+    if (writtenSamples != resultVectors[i].size()) {
+        std::cerr << "Error writing to file for thread " << i << std::endl;
+    }
   }
 
   // Just make the progress bar show 100%
   // printProgressBar(100, 100);
 
+  std::cout << "Audio file successfully processed and written." << std::endl;
+
   // Close the input and output files
   sf_close(inputFilePtr);
   sf_close(outputFilePtr);
 
-  std::cout << "Audio file successfully processed and written." << std::endl;
 
   exit(0);
 }
