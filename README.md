@@ -13,7 +13,10 @@ mkdir build && cd build
 ```
 
 ```bash
+# DEBUG build
 cmake ..
+# RELEASE build 
+cmake -DCMAKE_BUILD_TYPE=Release ..
 ```
 
 ```bash
