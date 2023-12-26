@@ -46,6 +46,8 @@ int main(int argc, char* argv[])
 {
   const int bufferSize = 8096;
 
+  std::cout << "Version 1.0.0" << std::endl;
+
   // Turn on fast tanh approximation
   nam::activations::Activation::enable_fast_tanh();
 
