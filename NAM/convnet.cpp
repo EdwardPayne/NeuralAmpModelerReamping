@@ -8,11 +8,9 @@
 #include <unordered_set>
 
 #include "dsp.h"
-#include "json.hpp"
-#include "util.h"
 #include "convnet.h"
 
-convnet::BatchNorm::BatchNorm(const int dim, std::vector<float>::iterator& params)
+nam::convnet::BatchNorm::BatchNorm(const int dim, std::vector<float>::iterator& weights)
 {
   // Extract from param buffer
   Eigen::VectorXf running_mean(dim);
@@ -20,14 +18,14 @@ convnet::BatchNorm::BatchNorm(const int dim, std::vector<float>::iterator& param
   Eigen::VectorXf _weight(dim);
   Eigen::VectorXf _bias(dim);
   for (int i = 0; i < dim; i++)
-    running_mean(i) = *(params++);
+    running_mean(i) = *(weights++);
   for (int i = 0; i < dim; i++)
-    running_var(i) = *(params++);
+    running_var(i) = *(weights++);
   for (int i = 0; i < dim; i++)
-    _weight(i) = *(params++);
+    _weight(i) = *(weights++);
   for (int i = 0; i < dim; i++)
-    _bias(i) = *(params++);
-  float eps = *(params++);
+    _bias(i) = *(weights++);
+  float eps = *(weights++);
 
   // Convert to scale & loc
   this->scale.resize(dim);
@@ -37,7 +35,7 @@ convnet::BatchNorm::BatchNorm(const int dim, std::vector<float>::iterator& param
   this->loc = _bias - this->scale.cwiseProduct(running_mean);
 }
 
-void convnet::BatchNorm::process_(Eigen::MatrixXf& x, const long i_start, const long i_end) const
+void nam::convnet::BatchNorm::process_(Eigen::MatrixXf& x, const long i_start, const long i_end) const
 {
   // todo using colwise?
   // #speed but conv probably dominates
@@ -48,20 +46,20 @@ void convnet::BatchNorm::process_(Eigen::MatrixXf& x, const long i_start, const 
   }
 }
 
-void convnet::ConvNetBlock::set_params_(const int in_channels, const int out_channels, const int _dilation,
-                                        const bool batchnorm, const std::string activation,
-                                        std::vector<float>::iterator& params)
+void nam::convnet::ConvNetBlock::set_weights_(const int in_channels, const int out_channels, const int _dilation,
+                                              const bool batchnorm, const std::string activation,
+                                              std::vector<float>::iterator& weights)
 {
   this->_batchnorm = batchnorm;
   // HACK 2 kernel
-  this->conv.set_size_and_params_(in_channels, out_channels, 2, _dilation, !batchnorm, params);
+  this->conv.set_size_and_weights_(in_channels, out_channels, 2, _dilation, !batchnorm, weights);
   if (this->_batchnorm)
-    this->batchnorm = BatchNorm(out_channels, params);
+    this->batchnorm = BatchNorm(out_channels, weights);
   this->activation = activations::Activation::get_activation(activation);
 }
 
-void convnet::ConvNetBlock::process_(const Eigen::MatrixXf& input, Eigen::MatrixXf& output, const long i_start,
-                                     const long i_end) const
+void nam::convnet::ConvNetBlock::process_(const Eigen::MatrixXf& input, Eigen::MatrixXf& output, const long i_start,
+                                          const long i_end) const
 {
   const long ncols = i_end - i_start;
   this->conv.process_(input, output, i_start, ncols, i_start);
@@ -71,21 +69,21 @@ void convnet::ConvNetBlock::process_(const Eigen::MatrixXf& input, Eigen::Matrix
   this->activation->apply(output.middleCols(i_start, ncols));
 }
 
-long convnet::ConvNetBlock::get_out_channels() const
+long nam::convnet::ConvNetBlock::get_out_channels() const
 {
   return this->conv.get_out_channels();
 }
 
-convnet::_Head::_Head(const int channels, std::vector<float>::iterator& params)
+nam::convnet::_Head::_Head(const int channels, std::vector<float>::iterator& weights)
 {
   this->_weight.resize(channels);
   for (int i = 0; i < channels; i++)
-    this->_weight[i] = *(params++);
-  this->_bias = *(params++);
+    this->_weight[i] = *(weights++);
+  this->_bias = *(weights++);
 }
 
-void convnet::_Head::process_(const Eigen::MatrixXf& input, Eigen::VectorXf& output, const long i_start,
-                              const long i_end) const
+void nam::convnet::_Head::process_(const Eigen::MatrixXf& input, Eigen::VectorXf& output, const long i_start,
+                                   const long i_end) const
 {
   const long length = i_end - i_start;
   output.resize(length);
@@ -93,25 +91,31 @@ void convnet::_Head::process_(const Eigen::MatrixXf& input, Eigen::VectorXf& out
     output(i) = this->_bias + input.col(j).dot(this->_weight);
 }
 
-convnet::ConvNet::ConvNet(const int channels, const std::vector<int>& dilations, const bool batchnorm,
-                          const std::string activation, std::vector<float>& params, const double expected_sample_rate)
+nam::convnet::ConvNet::ConvNet(const int channels, const std::vector<int>& dilations, const bool batchnorm,
+                               const std::string activation, std::vector<float>& weights,
+                               const double expected_sample_rate)
 : Buffer(*std::max_element(dilations.begin(), dilations.end()), expected_sample_rate)
 {
-  this->_verify_params(channels, dilations, batchnorm, params.size());
+  this->_verify_weights(channels, dilations, batchnorm, weights.size());
   this->_blocks.resize(dilations.size());
-  std::vector<float>::iterator it = params.begin();
+  std::vector<float>::iterator it = weights.begin();
   for (size_t i = 0; i < dilations.size(); i++)
-    this->_blocks[i].set_params_(i == 0 ? 1 : channels, channels, dilations[i], batchnorm, activation, it);
+    this->_blocks[i].set_weights_(i == 0 ? 1 : channels, channels, dilations[i], batchnorm, activation, it);
   this->_block_vals.resize(this->_blocks.size() + 1);
   for (auto& matrix : this->_block_vals)
     matrix.setZero();
   std::fill(this->_input_buffer.begin(), this->_input_buffer.end(), 0.0f);
   this->_head = _Head(channels, it);
-  if (it != params.end())
-    throw std::runtime_error("Didn't touch all the params when initializing ConvNet");
+  if (it != weights.end())
+    throw std::runtime_error("Didn't touch all the weights when initializing ConvNet");
+
+  _prewarm_samples = 1;
+  for (size_t i = 0; i < dilations.size(); i++)
+    _prewarm_samples += dilations[i];
 }
 
-void convnet::ConvNet::process(NAM_SAMPLE* input, NAM_SAMPLE* output, const int num_frames)
+
+void nam::convnet::ConvNet::process(NAM_SAMPLE* input, NAM_SAMPLE* output, const int num_frames)
 
 {
   this->_update_buffers_(input, num_frames);
@@ -130,13 +134,13 @@ void convnet::ConvNet::process(NAM_SAMPLE* input, NAM_SAMPLE* output, const int 
     output[s] = this->_head_output(s);
 }
 
-void convnet::ConvNet::_verify_params(const int channels, const std::vector<int>& dilations, const bool batchnorm,
-                                      const size_t actual_params)
+void nam::convnet::ConvNet::_verify_weights(const int channels, const std::vector<int>& dilations, const bool batchnorm,
+                                            const size_t actual_weights)
 {
   // TODO
 }
 
-void convnet::ConvNet::_update_buffers_(NAM_SAMPLE* input, const int num_frames)
+void nam::convnet::ConvNet::_update_buffers_(NAM_SAMPLE* input, const int num_frames)
 {
   this->Buffer::_update_buffers_(input, num_frames);
 
@@ -158,7 +162,7 @@ void convnet::ConvNet::_update_buffers_(NAM_SAMPLE* input, const int num_frames)
   }
 }
 
-void convnet::ConvNet::_rewind_buffers_()
+void nam::convnet::ConvNet::_rewind_buffers_()
 {
   // Need to rewind the block vals first because Buffer::rewind_buffers()
   // resets the offset index

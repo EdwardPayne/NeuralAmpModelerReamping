@@ -47,7 +47,7 @@ int main(int argc, char* argv[])
   const int bufferSize = 8096;
 
   // Turn on fast tanh approximation
-  activations::Activation::enable_fast_tanh();
+  nam::activations::Activation::enable_fast_tanh();
 
   // Check if the correct number of command-line arguments is provided
   if (argc != 4)
@@ -58,9 +58,9 @@ int main(int argc, char* argv[])
 
   const char* modelPath = argv[1];
   std::cout << "Loading model " << modelPath << "\n";
-  std::unique_ptr<DSP> model;  
+  std::unique_ptr<nam::DSP> model;
   model.reset();
-  model = std::move(get_dsp(modelPath));
+  model = std::move(nam::get_dsp(modelPath));
 
   if (model == nullptr)
   {
@@ -95,14 +95,12 @@ int main(int argc, char* argv[])
 
   sf_count_t numChunks = sfInfo.frames / bufferSize;
 
-  for (sf_count_t chunkIndex = 0; chunkIndex < numChunks; ++chunkIndex)
+  for (sf_count_t chunkIndex = 0; chunkIndex <= numChunks; ++chunkIndex)
   {
     sf_count_t bytesRead = sf_readf_double(inputFilePtr, buffer.data(), bufferSize);
 
-
     if (bytesRead <= 0)
     {
-      // End of file or error
       break;
     }
 
@@ -121,7 +119,7 @@ int main(int argc, char* argv[])
   sf_close(inputFilePtr);
   sf_close(outputFilePtr);
 
-  std::cout << "WAV file successfully processed and written." << std::endl;
+  std::cout << "Audio file successfully processed and written." << std::endl;
 
   exit(0);
 }
