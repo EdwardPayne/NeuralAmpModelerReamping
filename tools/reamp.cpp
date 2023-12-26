@@ -44,7 +44,7 @@ void printProgressBar(int current, int total, int width = 40)
 
 int main(int argc, char* argv[])
 {
-  const int bufferSize = 8096;
+  const int bufferSize = 8192;
 
   std::cout << "Version 1.0.0" << std::endl;
 
@@ -59,14 +59,14 @@ int main(int argc, char* argv[])
   }
 
   const char* modelPath = argv[1];
-  std::cout << "Loading model " << modelPath << "\n";
+  std::cout << "Loading model " << modelPath << std::endl;
   std::unique_ptr<nam::DSP> model;
   model.reset();
   model = std::move(nam::get_dsp(modelPath));
 
   if (model == nullptr)
   {
-    std::cerr << "Failed to load model\n";
+    std::cerr << "Failed to load model" << std::endl;
     exit(1);
   }
 
@@ -84,6 +84,7 @@ int main(int argc, char* argv[])
 
   // Open the output WAV file for writing
   SF_INFO outputInfo = sfInfo; // Copy input file info
+  outputInfo.channels = 1;
   SNDFILE* outputFilePtr = sf_open(outputFilename, SFM_WRITE, &outputInfo);
   if (!outputFilePtr)
   {
@@ -94,24 +95,33 @@ int main(int argc, char* argv[])
 
   std::vector<NAM_SAMPLE> buffer(bufferSize * sfInfo.channels);
   std::vector<NAM_SAMPLE> processedBuffer(bufferSize * sfInfo.channels);
+  std::vector<NAM_SAMPLE> leftChannelData(bufferSize);
 
   sf_count_t numChunks = sfInfo.frames / bufferSize;
 
   for (sf_count_t chunkIndex = 0; chunkIndex <= numChunks; ++chunkIndex)
   {
-    sf_count_t bytesRead = sf_readf_double(inputFilePtr, buffer.data(), bufferSize);
+    leftChannelData.clear();
 
-    if (bytesRead <= 0)
+    sf_count_t num_frames = sf_readf_double(inputFilePtr, buffer.data(), bufferSize);
+
+    if (num_frames <= 0)
     {
       break;
     }
 
-    model->process(buffer.data(), processedBuffer.data(), bytesRead);
-    model->finalize_(bytesRead);
+    for (sf_count_t i = 0; i < num_frames; ++i)
+    {
+      NAM_SAMPLE leftSample = buffer[i * sfInfo.channels];
+      leftChannelData.push_back(leftSample);
+    }
+
+    model->process(leftChannelData.data(), processedBuffer.data(), num_frames);
+    model->finalize_(num_frames);
 
     printProgressBar(chunkIndex, numChunks);
 
-    sf_writef_double(outputFilePtr, processedBuffer.data(), bytesRead);
+    sf_writef_double(outputFilePtr, processedBuffer.data(), num_frames);
   }
 
   // Just make the progress bar show 100%
