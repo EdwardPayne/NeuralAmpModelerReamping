@@ -95,14 +95,12 @@ int main(int argc, char* argv[])
 
   sf_count_t numChunks = sfInfo.frames / bufferSize;
 
-  for (sf_count_t chunkIndex = 0; chunkIndex < numChunks; ++chunkIndex)
+  for (sf_count_t chunkIndex = 0; chunkIndex <= numChunks; ++chunkIndex)
   {
     sf_count_t bytesRead = sf_readf_double(inputFilePtr, buffer.data(), bufferSize);
 
-
     if (bytesRead <= 0)
     {
-      // End of file or error
       break;
     }
 
@@ -121,7 +119,7 @@ int main(int argc, char* argv[])
   sf_close(inputFilePtr);
   sf_close(outputFilePtr);
 
-  std::cout << "WAV file successfully processed and written." << std::endl;
+  std::cout << "Audio file successfully processed and written." << std::endl;
 
   exit(0);
 }
